@@ -1,0 +1,94 @@
+# ==============================
+# Python
+# ==============================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+*.so
+
+# ==============================
+# Virtual Environments
+# ==============================
+venv/
+.venv/
+env/
+ENV/
+virtualenv/
+pip-wheel-metadata/
+
+# ==============================
+# Environment Variables
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# FastAPI / Uvicorn / Gunicorn
+# ==============================
+*.log
+uvicorn.log
+gunicorn.log
+
+# ==============================
+# Database
+# ==============================
+*.db
+*.sqlite3
+alembic.ini
+migrations/versions/*.pyc
+
+# ==============================
+# Alembic
+# ==============================
+alembic/versions/__pycache__/
+
+# ==============================
+# Testing
+# ==============================
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ==============================
+# Caches & Temp Files
+# ==============================
+.cache/
+tmp/
+*.tmp
+
+# ==============================
+# IDE & Editor
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ==============================
+# OS Files
+# ==============================
+Thumbs.db
+
+# ==============================
+# Build & Distribution
+# ==============================
+build/
+dist/
+*.egg-info/
+
+# ==============================
+# Docker
+# ==============================
+docker-compose.override.yml
+
+# ==============================
+# Logs & Runtime Files
+# ==============================
+*.pid
+*.sock
