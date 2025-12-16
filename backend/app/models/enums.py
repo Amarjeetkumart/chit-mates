@@ -9,10 +9,10 @@ class CardType(str, Enum):
 
 
 CARD_POINTS: dict[CardType, int] = {
-    CardType.HEART: 1000,
-    CardType.DIAMOND: 800,
-    CardType.TREE: 500,
-    CardType.BLACK_JACK: 300,
+    CardType.HEART: 250,
+    CardType.DIAMOND: 200,
+    CardType.TREE: 125,
+    CardType.BLACK_JACK: 75,
 }
 
 
