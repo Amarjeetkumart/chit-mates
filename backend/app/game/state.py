@@ -99,6 +99,7 @@ class RoundStateFactory:
         game_id: UUID,
         players: list[tuple[UUID, int]],
         hands: dict[UUID, list[CardType]],
+        starter_player_id: UUID | None = None,
     ) -> RoundState:
         turn_order = [player_id for player_id, _ in sorted(players, key=lambda item: item[1])]
         player_states = {
@@ -112,5 +113,7 @@ class RoundStateFactory:
             active_player_index=0,
             players=player_states,
         )
+        if starter_player_id is not None:
+            state.set_active_player(starter_player_id)
         state.register_snapshot()
         return state

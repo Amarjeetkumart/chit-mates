@@ -85,7 +85,14 @@ class GameService:
         await self.session.flush()
 
         ordered_pairs = [(gp.id, gp.seat_position) for gp in game_players]
-        round_state = self.engine.create_round_state(round_record.id, game.id, ordered_pairs)
+        starter_game_player = next((gp for gp in game_players if gp.room_player_id == payload.room_player_id), None)
+        starter_player_id = starter_game_player.id if starter_game_player else None
+        round_state = self.engine.create_round_state(
+            round_record.id,
+            game.id,
+            ordered_pairs,
+            starter_player_id=starter_player_id,
+        )
         round_record.state_snapshot = round_state.model_dump(mode="json")
 
         await self._initialize_cards(round_record.id, round_state)
@@ -103,12 +110,20 @@ class GameService:
             raise ValueError("Round is not active")
 
         state = RoundState.model_validate(round_record.state_snapshot)
-        state, score_updates, receiver_id = self.engine.pass_card(state, payload.sender_id, payload.card_type)
+        state, score_updates, receiver_id, auto_transfers = self.engine.pass_card(
+            state,
+            payload.sender_id,
+            payload.card_type,
+        )
 
         await self._update_cards(round_record.id, payload.sender_id, receiver_id, payload.card_type)
+        for auto_sender_id, auto_receiver_id, auto_card in auto_transfers:
+            await self._update_cards(round_record.id, auto_sender_id, auto_receiver_id, auto_card)
         await self._persist_round_state(round_record, state)
         await self._persist_scores(round_record.game_id, score_updates, state)
         await self._record_move(round_record, payload.sender_id, receiver_id, payload.card_type)
+        for auto_sender_id, auto_receiver_id, auto_card in auto_transfers:
+            await self._record_move(round_record, auto_sender_id, auto_receiver_id, auto_card)
 
         if state.is_round_complete():
             await self._finalize_round(round_record, state)
@@ -165,7 +180,14 @@ class GameService:
         await self.session.flush()
 
         ordered_pairs = [(gp.id, gp.seat_position) for gp in sorted(game.players, key=lambda gp: gp.seat_position)]
-        round_state = self.engine.create_round_state(round_record.id, game.id, ordered_pairs)
+        starter_game_player = next((gp for gp in game.players if gp.room_player_id == payload.room_player_id), None)
+        starter_player_id = starter_game_player.id if starter_game_player else None
+        round_state = self.engine.create_round_state(
+            round_record.id,
+            game.id,
+            ordered_pairs,
+            starter_player_id=starter_player_id,
+        )
         round_record.state_snapshot = round_state.model_dump(mode="json")
         await self._initialize_cards(round_record.id, round_state)
 

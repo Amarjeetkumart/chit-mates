@@ -44,6 +44,7 @@ class GameEngine:
         round_id: UUID,
         game_id: UUID,
         ordered_players: list[tuple[UUID, int]],
+        starter_player_id: UUID | None = None,
     ) -> RoundState:
         deal_result = self.deal_cards([player_id for player_id, _ in ordered_players])
         return RoundStateFactory.create(
@@ -51,6 +52,7 @@ class GameEngine:
             game_id=game_id,
             players=ordered_players,
             hands=deal_result.hands,
+            starter_player_id=starter_player_id,
         )
 
     def validate_pass(
@@ -76,7 +78,7 @@ class GameEngine:
         state: RoundState,
         sender_id: UUID,
         card_type: CardType,
-    ) -> tuple[RoundState, dict[UUID, int], UUID]:
+    ) -> tuple[RoundState, dict[UUID, int], UUID, list[tuple[UUID, UUID, CardType]]]:
         receiver_id = self.validate_pass(state, sender_id, card_type)
         sender_state = state.players[sender_id]
         receiver_state = state.players[receiver_id]
@@ -87,6 +89,7 @@ class GameEngine:
         state.record_pass(sender_id, receiver_id, card_type)
 
         score_updates: dict[UUID, int] = {}
+        auto_transfers: list[tuple[UUID, UUID, CardType]] = []
 
         winner_card = self._detect_four_of_a_kind(receiver_state)
         if winner_card is not None:
@@ -110,6 +113,7 @@ class GameEngine:
                 next_holder_state.cards.extend(leftover_cards)
                 for leftover_card in leftover_cards:
                     state.record_pass(receiver_id, next_holder_id, leftover_card)
+                    auto_transfers.append((receiver_id, next_holder_id, leftover_card))
 
         if state.is_round_complete():
             remaining = state.remaining_active_players()
@@ -120,7 +124,7 @@ class GameEngine:
                 loser_state.finish_position = len(state.finish_order) + 1
                 state.finish_order.append(loser_id)
             state.turn_counter += 1
-            return state, score_updates, receiver_id
+            return state, score_updates, receiver_id, auto_transfers
 
         if receiver_id in state.finish_order:
             next_active = state.get_player_after(receiver_id)
@@ -132,7 +136,7 @@ class GameEngine:
         loop_detected = state.register_snapshot()
         if loop_detected and self._should_declare_draw(state):
             self._finalize_draw(state)
-        return state, score_updates, receiver_id
+        return state, score_updates, receiver_id, auto_transfers
 
     def _detect_four_of_a_kind(self, player_state: PlayerRoundState) -> CardType | None:
         counter = Counter(player_state.cards)
