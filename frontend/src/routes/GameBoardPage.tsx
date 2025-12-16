@@ -251,27 +251,6 @@ export function GameBoardPage() {
         </div>
       ) : null}
 
-      <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-card backdrop-blur">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-2xl font-semibold text-white">Players</h2>
-          <span className="text-sm text-slate-400">
-            {activePlayerName ? `Active: ${isMyTurn ? "You" : activePlayerName}` : "Waiting for first move"}
-          </span>
-        </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {activeRound?.players.map((playerState) => (
-            <PlayerCard
-              key={playerState.game_player_id}
-              player={playerState}
-              isMe={playerState.game_player_id === gamePlayerId}
-              isActive={playerState.game_player_id === activeRound.active_player_id}
-              isDraw={drawPlayers.includes(playerState.game_player_id)}
-              isNextStarter={nextStarter?.id === playerState.room_player_id}
-            />
-          ))}
-        </div>
-      </section>
-
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-card backdrop-blur">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-2xl font-semibold text-white">Your Hand</h2>
@@ -359,6 +338,27 @@ export function GameBoardPage() {
             Waiting for {nextStarter.user.display_name} to start the next round...
           </p>
         ) : null}
+      </section>
+
+      <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-card backdrop-blur">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-2xl font-semibold text-white">Players</h2>
+          <span className="text-sm text-slate-400">
+            {activePlayerName ? `Active: ${isMyTurn ? "You" : activePlayerName}` : "Waiting for first move"}
+          </span>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {activeRound?.players.map((playerState) => (
+            <PlayerCard
+              key={playerState.game_player_id}
+              player={playerState}
+              isMe={playerState.game_player_id === gamePlayerId}
+              isActive={playerState.game_player_id === activeRound.active_player_id}
+              isDraw={drawPlayers.includes(playerState.game_player_id)}
+              isNextStarter={nextStarter?.id === playerState.room_player_id}
+            />
+          ))}
+        </div>
       </section>
     </div>
   );
