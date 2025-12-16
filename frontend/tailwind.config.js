@@ -49,10 +49,36 @@ export default {
             filter: "blur(2px)",
           },
         },
+        "modal-pop": {
+          "0%": {
+            opacity: "0",
+            transform: "scale(0.9) translateY(40px)",
+          },
+          "60%": {
+            opacity: "1",
+            transform: "scale(1.02) translateY(0)",
+          },
+          "100%": {
+            opacity: "1",
+            transform: "scale(1)",
+          },
+        },
+        "badge-pulse": {
+          "0%, 100%": {
+            opacity: "0.8",
+            transform: "scale(1)",
+          },
+          "50%": {
+            opacity: "1",
+            transform: "scale(1.08)",
+          },
+        },
       },
       animation: {
         "card-flight": "card-flight 650ms ease-in-out forwards",
         "soft-glow": "soft-glow 4s ease-in-out infinite",
+        "modal-pop": "modal-pop 450ms ease-out",
+        "badge-pulse": "badge-pulse 3200ms ease-in-out infinite",
       },
     },
   },

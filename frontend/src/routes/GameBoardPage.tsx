@@ -59,6 +59,11 @@ interface FlightState {
   key: number;
 }
 
+interface FinalStanding extends GamePlayerState {
+  rank: number;
+  status: "champion" | "runner_up" | "third" | "loser";
+}
+
 export function GameBoardPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
@@ -76,6 +81,8 @@ export function GameBoardPage() {
   );
 
   const [lastMessage, setLastMessage] = useState<string | null>(null);
+  const [showFinalResults, setShowFinalResults] = useState(false);
+  const [hasAcknowledgedResults, setHasAcknowledgedResults] = useState(false);
   const [flyingCard, setFlyingCard] = useState<FlightState | null>(null);
   const flightTimeoutRef = useRef<number | null>(null);
   const playerRoomId = player?.id ?? null;
@@ -155,6 +162,44 @@ export function GameBoardPage() {
     ? sortedRoomPlayers.find((roomPlayer) => roomPlayer.seat_position === nextStarterSeat)
     : undefined;
   const isNextRoundStarter = playerSeat === nextStarterSeat;
+  const isGameComplete = Boolean(
+    game &&
+      ((game.status === "completed" && activeRound?.status === "finished") ||
+        (game.current_round_index === game.total_rounds && activeRound?.status === "finished")),
+  );
+  const finalStandings = useMemo<FinalStanding[]>(() => {
+    if (!activeRound || !activeRound.players.length) {
+      return [];
+    }
+    const ordered = [...activeRound.players].sort((a, b) => b.score - a.score);
+    return ordered.map((playerState, index, array) => {
+      let status: FinalStanding["status"];
+      if (index === 0) {
+        status = "champion";
+      } else if (index === 1) {
+        status = "runner_up";
+      } else if (index === array.length - 1) {
+        status = "loser";
+      } else {
+        status = "third";
+      }
+      return {
+        ...playerState,
+        rank: index + 1,
+        status,
+      };
+    });
+  }, [activeRound]);
+
+  useEffect(() => {
+    if (isGameComplete && !hasAcknowledgedResults) {
+      setShowFinalResults(true);
+    }
+    if (!isGameComplete) {
+      setShowFinalResults(false);
+      setHasAcknowledgedResults(false);
+    }
+  }, [isGameComplete, hasAcknowledgedResults]);
 
   const passCardMutation = useMutation({
     mutationFn: passCard,
@@ -192,6 +237,19 @@ export function GameBoardPage() {
     onError: (error: Error) => setLastMessage(error.message),
   });
 
+  const handleCloseResults = () => {
+    setHasAcknowledgedResults(true);
+    setShowFinalResults(false);
+  };
+
+  const handleReturnToLobby = () => {
+    setHasAcknowledgedResults(true);
+    setShowFinalResults(false);
+    if (room?.code) {
+      navigate(`/lobby/${room.code}`);
+    }
+  };
+
   const handlePassCard = (card: CardType) => {
     if (!activeRound || !gamePlayerId || passCardMutation.isPending) {
       return;
@@ -218,6 +276,10 @@ export function GameBoardPage() {
 
   return (
     <div className="relative space-y-8">
+      {showFinalResults && finalStandings.length ? (
+        <FinalResultsModal standings={finalStandings} onClose={handleCloseResults} onReturn={handleReturnToLobby} />
+      ) : null}
+
       {flyingCard ? <FloatingCard key={flyingCard.key} card={flyingCard.card} /> : null}
 
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -483,6 +545,109 @@ function FloatingCard({ card }: { card: CardType }) {
           <span className="text-lg font-semibold tracking-wide">{CARD_LABEL[card]}</span>
         </div>
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2),transparent)]" />
+      </div>
+    </div>
+  );
+}
+
+interface FinalResultsModalProps {
+  standings: FinalStanding[];
+  onClose: () => void;
+  onReturn: () => void;
+}
+
+function FinalResultsModal({ standings, onClose, onReturn }: FinalResultsModalProps) {
+  if (!standings.length) {
+    return null;
+  }
+
+  const champion = standings[0];
+  const statusLabel: Record<FinalStanding["status"], string> = {
+    champion: "Champion",
+    runner_up: "Runner-up",
+    third: "Third Place",
+    loser: "Loser",
+  };
+  const cardBackground: Record<FinalStanding["status"], string> = {
+    champion: "from-amber-500/25 via-rose-500/20 to-orange-400/15",
+    runner_up: "from-sky-500/25 via-blue-500/15 to-indigo-500/15",
+    third: "from-emerald-500/20 via-teal-500/15 to-sky-500/10",
+    loser: "from-rose-500/25 via-red-500/20 to-slate-900/25",
+  };
+  const badgeTone: Record<FinalStanding["status"], string> = {
+    champion: "bg-amber-500/20 text-amber-200",
+    runner_up: "bg-sky-500/20 text-sky-200",
+    third: "bg-emerald-500/20 text-emerald-200",
+    loser: "bg-rose-500/25 text-rose-200",
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur">
+      <div className="relative w-full max-w-3xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-slate-900/95 via-slate-900/85 to-slate-900/70 p-8 text-slate-100 shadow-[0_45px_140px_-45px_rgba(59,130,246,0.75)] animate-modal-pop">
+        <div className="pointer-events-none absolute -top-40 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-[-5rem] right-[-3rem] h-60 w-60 rounded-full bg-rose-500/20 blur-3xl" />
+
+        <div className="relative space-y-4 text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-amber-200 animate-badge-pulse">
+            Final Results
+          </span>
+          <h2 className="font-heading text-3xl font-semibold text-white">
+            {champion ? `${champion.display_name} reigns supreme!` : "Game Complete"}
+          </h2>
+          <p className="text-sm text-slate-300">
+            Scores are locked in after all rounds. Celebrate the winners and rally the squad for the next match.
+          </p>
+        </div>
+
+        <ul className="relative mt-8 grid gap-4 sm:grid-cols-2">
+          {standings.map((player) => (
+            <li
+              key={player.game_player_id}
+              className={clsx(
+                "group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br p-6 backdrop-blur-sm",
+                cardBackground[player.status],
+              )}
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.25em] text-slate-300">#{player.rank}</p>
+                  <h3 className="text-xl font-semibold text-white">{player.display_name}</h3>
+                </div>
+                <span className="rounded-full bg-slate-900/60 px-3 py-1 text-xs font-semibold text-slate-200">
+                  {player.score} pts
+                </span>
+              </div>
+              <div className="relative mt-5 flex items-center justify-between gap-3 text-sm text-slate-200">
+                <span className={clsx("rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em]", badgeTone[player.status])}>
+                  {statusLabel[player.status]}
+                </span>
+                {player.status === "champion" ? <span className="text-2xl">🏆</span> : null}
+                {player.status === "loser" ? <span className="text-2xl">💀</span> : null}
+              </div>
+              <p className="relative mt-3 text-xs text-slate-300">
+                Cards remaining: {player.cards.length} · Seat {player.seat_position}
+              </p>
+            </li>
+          ))}
+        </ul>
+
+        <div className="relative mt-8 flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/25 hover:bg-white/10"
+          >
+            View Board
+          </button>
+          <button
+            type="button"
+            onClick={onReturn}
+            className="rounded-2xl bg-gradient-to-r from-sky-500 via-brand-500 to-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:brightness-110"
+          >
+            Return to Lobby
+          </button>
+        </div>
       </div>
     </div>
   );
