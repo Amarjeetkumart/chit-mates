@@ -112,38 +112,82 @@ export function LobbyPage() {
   });
 
   return (
-    <div className="page">
-      <header className="page__header">
-        <h1>Lobby</h1>
+    <div className="space-y-8">
+      <header className="space-y-3">
+        <h1 className="font-heading text-4xl font-semibold tracking-tight text-white">Lobby</h1>
         {resolvedRoom ? (
-          <p>
-            Room Code: <strong>{resolvedRoom.code}</strong> · Rounds: {resolvedRoom.configured_rounds}
-          </p>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 font-semibold text-sky-300">
+              <span className="text-xs uppercase tracking-[0.18em] text-sky-200">Room</span>
+              <span className="text-lg text-white">{resolvedRoom.code}</span>
+            </span>
+            <span className="rounded-full border border-white/10 px-4 py-2 text-slate-200">
+              Rounds: {resolvedRoom.configured_rounds}
+            </span>
+            <span className="rounded-full border border-white/10 px-4 py-2 text-slate-200">
+              Players: {playerCount}/4
+            </span>
+          </div>
         ) : (
-          <p>Loading room details...</p>
+          <p className="text-slate-400">Loading room details...</p>
         )}
       </header>
 
-      <section className="panel">
-        <h2>Players ({playerCount}/4)</h2>
-        <ul className="list">
+      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-card backdrop-blur">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-2xl font-semibold text-white">Players</h2>
+          <span className="text-sm text-slate-300">Seats fill clockwise · host starts round one</span>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
           {resolvedRoom?.players.length ? (
-            resolvedRoom.players.map((roomPlayer) => (
-              <li key={roomPlayer.id} className="list__item">
-                <span className="badge">Seat {roomPlayer.seat_position}</span>
-                <span className="list__item-name">{roomPlayer.user.display_name}</span>
-                {resolvedRoom.host_user_id === roomPlayer.user.id ? <span className="tag">Host</span> : null}
-              </li>
-            ))
+            resolvedRoom.players.map((roomPlayer) => {
+              const isMe = roomPlayer.id === playerId;
+              const isHost = resolvedRoom.host_user_id === roomPlayer.user.id;
+              return (
+                <div
+                  key={roomPlayer.id}
+                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 p-5 shadow-inner transition hover:border-sky-400/60"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Seat {roomPlayer.seat_position}</p>
+                      <p className="text-lg font-semibold text-white">{roomPlayer.user.display_name}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      {isHost ? (
+                        <span className="rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold uppercase text-amber-200">
+                          Host
+                        </span>
+                      ) : null}
+                      {isMe ? (
+                        <span className="rounded-full bg-sky-500/20 px-3 py-1 text-xs font-semibold uppercase text-sky-200">
+                          You
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-3 text-xs text-slate-400">
+                    <span className="rounded-full bg-white/5 px-3 py-1 font-semibold uppercase tracking-[0.25em] text-slate-300">
+                      {roomPlayer.is_ready ? "Ready" : "Joining"}
+                    </span>
+                    <span>
+                      Joined {new Date(roomPlayer.joined_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
           ) : (
-            <li>No players yet</li>
+            <div className="col-span-full rounded-2xl border border-dashed border-white/10 p-10 text-center text-slate-400">
+              Waiting for players to join...
+            </div>
           )}
-        </ul>
+        </div>
       </section>
 
       {canStart ? (
         <button
-          className="button button--primary"
+          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-500 to-purple-500 px-6 py-3 text-base font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           onClick={() => {
             if (!resolvedRoom || !player) {
               return;
@@ -155,13 +199,13 @@ export function LobbyPage() {
           {startGameMutation.isPending ? "Starting..." : "Start Game"}
         </button>
       ) : (
-        <p>
+        <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 px-6 py-4 text-sm text-slate-300">
           {playerCount < 4
             ? "Waiting for additional players to join..."
             : nextStarter
               ? `Waiting for ${nextStarter.user.display_name} to start the game...`
               : "Waiting for the designated starter..."}
-        </p>
+        </div>
       )}
     </div>
   );
