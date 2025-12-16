@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 
@@ -17,6 +17,22 @@ export function HomePage() {
   const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
   const [joinName, setJoinName] = useState("");
   const [joinCode, setJoinCode] = useState("");
+
+  const clampRounds = (value: number) => {
+    if (Number.isNaN(value) || value <= 0) {
+      return 1;
+    }
+    return Math.min(50, Math.max(1, value));
+  };
+
+  const adjustRounds = (delta: number) => {
+    setRounds((previous) => clampRounds(previous + delta));
+  };
+
+  const onRoundsChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const parsed = Number.parseInt(event.target.value, 10);
+    setRounds(clampRounds(parsed));
+  };
 
   const createMutation = useMutation({
     mutationFn: createRoom,
@@ -89,15 +105,36 @@ export function HomePage() {
               </label>
               <label className="block space-y-2 text-sm font-medium text-slate-200">
                 Number of Games
-                <input
-                  className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-base text-white shadow-inner focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
-                  required
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={rounds}
-                  onChange={(event) => setRounds(Number.parseInt(event.target.value, 10) || DEFAULT_ROUNDS)}
-                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => adjustRounds(-1)}
+                    disabled={rounds <= 1}
+                    aria-label="Decrease games"
+                    className="rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-lg font-semibold text-slate-200 transition hover:border-sky-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    −
+                  </button>
+                  <input
+                    className="w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-center text-base text-white shadow-inner focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                    required
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={50}
+                    value={rounds}
+                    onChange={onRoundsChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => adjustRounds(1)}
+                    disabled={rounds >= 50}
+                    aria-label="Increase games"
+                    className="rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-lg font-semibold text-slate-200 transition hover:border-sky-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    +
+                  </button>
+                </div>
               </label>
               <button
                 className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-sky-500 via-brand-500 to-purple-500 px-5 py-3 text-sm font-semibold text-white shadow-glow transition hover:shadow-lg hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"

@@ -245,9 +245,7 @@ export function GameBoardPage() {
   const handleReturnToLobby = () => {
     setHasAcknowledgedResults(true);
     setShowFinalResults(false);
-    if (room?.code) {
-      navigate(`/lobby/${room.code}`);
-    }
+    navigate("/");
   };
 
   const handlePassCard = (card: CardType) => {
@@ -645,7 +643,7 @@ function FinalResultsModal({ standings, onClose, onReturn }: FinalResultsModalPr
             onClick={onReturn}
             className="rounded-2xl bg-gradient-to-r from-sky-500 via-brand-500 to-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:brightness-110"
           >
-            Return to Lobby
+            Start New Game
           </button>
         </div>
       </div>
