@@ -580,8 +580,8 @@ function FinalResultsModal({ standings, onClose, onReturn }: FinalResultsModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur">
-      <div className="relative w-full max-w-3xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-slate-900/95 via-slate-900/85 to-slate-900/70 p-8 text-slate-100 shadow-[0_45px_140px_-45px_rgba(59,130,246,0.75)] animate-modal-pop">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur overflow-y-auto lg:overflow-visible">
+      <div className="relative w-full max-w-3xl overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-slate-900/95 via-slate-900/85 to-slate-900/70 p-8 text-slate-100 shadow-[0_45px_140px_-45px_rgba(59,130,246,0.75)] animate-modal-pop max-h-[calc(100dvh-3rem)] overflow-y-auto sm:max-h-[calc(100dvh-4rem)] lg:max-h-none lg:overflow-visible">
         <div className="pointer-events-none absolute -top-40 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-sky-500/25 blur-3xl" />
         <div className="pointer-events-none absolute bottom-[-5rem] right-[-3rem] h-60 w-60 rounded-full bg-rose-500/20 blur-3xl" />
 
@@ -592,9 +592,9 @@ function FinalResultsModal({ standings, onClose, onReturn }: FinalResultsModalPr
           <h2 className="font-heading text-3xl font-semibold text-white">
             {champion ? `${champion.display_name} reigns supreme!` : "Game Complete"}
           </h2>
-          <p className="text-sm text-slate-300">
+          {/* <p className="text-sm text-slate-300">
             Scores are locked in after all rounds. Celebrate the winners and rally the squad for the next match.
-          </p>
+          </p> */}
         </div>
 
         <ul className="relative mt-8 grid gap-4 sm:grid-cols-2">

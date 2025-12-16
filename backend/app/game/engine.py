@@ -91,29 +91,30 @@ class GameEngine:
         score_updates: dict[UUID, int] = {}
         auto_transfers: list[tuple[UUID, UUID, CardType]] = []
 
-        winner_card = self._detect_four_of_a_kind(receiver_state)
-        if winner_card is not None:
-            finish_position = len(state.finish_order) + 1
-            score_delta = CARD_POINTS[winner_card] * 4
-            receiver_state.score += score_delta
-            score_updates[receiver_id] = score_delta
-            state.winner_cards[receiver_id] = winner_card
-            leftover_cards: list[CardType] = []
-            removed = 0
-            for card in receiver_state.cards:
-                if card == winner_card and removed < 4:
-                    removed += 1
-                    continue
-                leftover_cards.append(card)
-            receiver_state.cards.clear()
-            state.eliminate_player(receiver_id, finish_position)
-            if leftover_cards and state.remaining_active_players():
-                next_holder_id = state.get_player_after(receiver_id)
-                next_holder_state = state.players[next_holder_id]
-                next_holder_state.cards.extend(leftover_cards)
-                for leftover_card in leftover_cards:
-                    state.record_pass(receiver_id, next_holder_id, leftover_card)
-                    auto_transfers.append((receiver_id, next_holder_id, leftover_card))
+        # Resolve immediate chain wins that can cascade from the received card
+        winners_queue: deque[UUID] = deque([receiver_id])
+        processed: set[UUID] = set()
+        last_winner_id: UUID | None = None
+
+        while winners_queue:
+            candidate_id = winners_queue.popleft()
+            if candidate_id in processed:
+                continue
+            processed.add(candidate_id)
+
+            candidate_state = state.players[candidate_id]
+            if not candidate_state.is_active:
+                continue
+
+            winner_card = self._detect_four_of_a_kind(candidate_state)
+            if winner_card is None:
+                continue
+
+            next_candidate_id = self._finalize_winner(state, candidate_id, winner_card, score_updates, auto_transfers)
+            last_winner_id = candidate_id
+
+            if next_candidate_id is not None and state.players[next_candidate_id].is_active:
+                winners_queue.append(next_candidate_id)
 
         if state.is_round_complete():
             remaining = state.remaining_active_players()
@@ -126,7 +127,9 @@ class GameEngine:
             state.turn_counter += 1
             return state, score_updates, receiver_id, auto_transfers
 
-        if receiver_id in state.finish_order:
+        if last_winner_id is not None:
+            next_active = state.get_player_after(last_winner_id)
+        elif receiver_id in state.finish_order:
             next_active = state.get_player_after(receiver_id)
         else:
             next_active = receiver_id
@@ -137,6 +140,58 @@ class GameEngine:
         if loop_detected and self._should_declare_draw(state):
             self._finalize_draw(state)
         return state, score_updates, receiver_id, auto_transfers
+
+    def _finalize_winner(
+        self,
+        state: RoundState,
+        winner_id: UUID,
+        winner_card: CardType,
+        score_updates: dict[UUID, int],
+        auto_transfers: list[tuple[UUID, UUID, CardType]],
+    ) -> UUID | None:
+        winner_state = state.players[winner_id]
+
+        finish_position = len(state.finish_order) + 1
+        score_delta = CARD_POINTS[winner_card] * 4
+        winner_state.score += score_delta
+        score_updates[winner_id] = score_updates.get(winner_id, 0) + score_delta
+        state.winner_cards[winner_id] = winner_card
+
+        active_players = state.remaining_active_players()
+        next_receiver_id: UUID | None = None
+
+        # Forced pass: winner must hand off one card before exiting the round
+        if len(active_players) > 1:
+            next_receiver_id = state.get_player_after(winner_id)
+            receiver_state = state.players[next_receiver_id]
+            winner_state.cards.remove(winner_card)
+            receiver_state.cards.append(winner_card)
+            state.record_pass(winner_id, next_receiver_id, winner_card)
+            auto_transfers.append((winner_id, next_receiver_id, winner_card))
+        else:
+            winner_state.cards.remove(winner_card)
+
+        removed = 0
+        while winner_card in winner_state.cards and removed < 3:
+            winner_state.cards.remove(winner_card)
+            removed += 1
+
+        leftover_cards = list(winner_state.cards)
+        winner_state.cards.clear()
+
+        state.eliminate_player(winner_id, finish_position)
+
+        if leftover_cards:
+            if next_receiver_id is None and state.remaining_active_players():
+                next_receiver_id = state.get_player_after(winner_id)
+            if next_receiver_id is not None:
+                receiver_state = state.players[next_receiver_id]
+                receiver_state.cards.extend(leftover_cards)
+                for leftover_card in leftover_cards:
+                    state.record_pass(winner_id, next_receiver_id, leftover_card)
+                    auto_transfers.append((winner_id, next_receiver_id, leftover_card))
+
+        return next_receiver_id
 
     def _detect_four_of_a_kind(self, player_state: PlayerRoundState) -> CardType | None:
         counter = Counter(player_state.cards)
