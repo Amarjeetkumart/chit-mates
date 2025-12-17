@@ -19,6 +19,19 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = Field(default=True)
     websocket_ping_interval: int = Field(default=20)
     default_rounds: int = Field(default=1)
+    chat_history_limit: int = Field(default=200)
+    chat_rate_limit_count: int = Field(default=5)
+    chat_rate_limit_window_seconds: int = Field(default=4)
+    chat_profanity_blocklist: list[str] = Field(
+        default_factory=lambda: [
+            "shit",
+            "fuck",
+            "bitch",
+            "asshole",
+            "bastard",
+        ]
+    )
+    voice_stun_servers: list[str] = Field(default_factory=lambda: ["stun:stun.l.google.com:19302"])
 
     model_config = SettingsConfigDict(
         env_file=".env",
