@@ -2,6 +2,10 @@ import axios from "axios";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
+function stripApiSuffix(pathname: string): string {
+  return pathname.replace(/\/?api\/?$/, "");
+}
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -20,12 +24,28 @@ export function getWebSocketUrl(roomCode: string): string {
   try {
     const url = new URL(API_BASE_URL);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    const path = url.pathname.replace(/\/?api\/?$/, "");
+    const path = stripApiSuffix(url.pathname);
     const normalizedPath = path.endsWith("/") ? path.slice(0, -1) : path;
     return `${url.origin}${normalizedPath}/ws/rooms/${roomCode}`;
   } catch {
     // Fallback for relative URLs
     const base = API_BASE_URL.replace(/^http/, "ws").replace(/\/?api\/?$/, "");
     return `${base}/ws/rooms/${roomCode}`;
+  }
+}
+
+export function getSocketBaseUrl(): string {
+  const socketBase = import.meta.env.VITE_SOCKET_BASE_URL;
+  if (socketBase) {
+    return socketBase.endsWith("/") ? socketBase.slice(0, -1) : socketBase;
+  }
+
+  try {
+    const url = new URL(API_BASE_URL);
+    const path = stripApiSuffix(url.pathname);
+    const normalizedPath = path.endsWith("/") ? path.slice(0, -1) : path;
+    return `${url.origin}${normalizedPath}`;
+  } catch {
+    return API_BASE_URL.replace(/\/?api\/?$/, "");
   }
 }

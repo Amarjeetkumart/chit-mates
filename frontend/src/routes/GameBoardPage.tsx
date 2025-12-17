@@ -5,6 +5,9 @@ import clsx from "clsx";
 
 import { fetchGameState, passCard, startNextRound } from "../api/game";
 import { connectToRoomSocket } from "../services/websocket";
+import { ChatPanel } from "../components/ChatPanel";
+import { VoicePanel } from "../components/VoicePanel";
+import { useRoomSocket } from "../hooks/useRoomSocket";
 import { useGameStore } from "../store/useGameStore";
 import type { CardType, GamePlayerState, GameStateResponse } from "../types/api";
 
@@ -87,6 +90,7 @@ export function GameBoardPage() {
   const flightTimeoutRef = useRef<number | null>(null);
   const playerRoomId = player?.id ?? null;
   const playerSeat = player?.seat_position ?? null;
+  const { socket: realtimeSocket, isConnected: realtimeConnected } = useRoomSocket(room?.code, player ?? null);
 
   useEffect(() => {
     if (!lastMessage) {
@@ -167,6 +171,7 @@ export function GameBoardPage() {
       ((game.status === "completed" && activeRound?.status === "finished") ||
         (game.current_round_index === game.total_rounds && activeRound?.status === "finished")),
   );
+  const isMatchActive = Boolean(game && game.status === "in_progress");
   const finalStandings = useMemo<FinalStanding[]>(() => {
     if (!activeRound || !activeRound.players.length) {
       return [];
@@ -310,6 +315,18 @@ export function GameBoardPage() {
           {lastMessage}
         </div>
       ) : null}
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <ChatPanel socket={realtimeSocket} roomCode={room?.code} player={player ?? null} isConnected={realtimeConnected} />
+        <VoicePanel
+          socket={realtimeSocket}
+          roomCode={room?.code}
+          player={player ?? null}
+          isConnected={realtimeConnected}
+          isMatchActive={isMatchActive}
+          shouldForceDisconnect={isGameComplete}
+        />
+      </section>
 
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-card backdrop-blur">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

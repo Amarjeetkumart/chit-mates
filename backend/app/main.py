@@ -10,6 +10,8 @@ from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.base import Base
 from app.db.session import engine
+from app.realtime import create_socket_app
+import app.realtime.events  # noqa: F401 - ensure handlers are registered
 
 configure_logging(settings.debug)
 
@@ -22,9 +24,9 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.project_name, debug=settings.debug, lifespan=lifespan)
+fastapi_app = FastAPI(title=settings.project_name, debug=settings.debug, lifespan=lifespan)
 
-app.add_middleware(
+fastapi_app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,
     allow_credentials=settings.cors_allow_credentials,
@@ -32,9 +34,15 @@ app.add_middleware(
     allow_headers=settings.cors_allow_headers,
 )
 
-app.include_router(api_router, prefix=settings.api_prefix)
+fastapi_app.include_router(api_router, prefix=settings.api_prefix)
 
 
-@app.get("/health", tags=["health"])
+@fastapi_app.get("/health", tags=["health"])
 async def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app = create_socket_app(fastapi_app)
+
+# Re-export FastAPI application for tests if needed
+api_app = fastapi_app

@@ -24,6 +24,7 @@ from app.models import (
     Round,
     RoundStatus,
 )
+from app.realtime import trigger_voice_shutdown
 from app.schemas.game import (
     GamePlayerState,
     GameStartRequest,
@@ -377,6 +378,7 @@ class GameService:
             game.status = GameStatus.COMPLETED
             if game.room:
                 game.room.status = RoomStatus.COMPLETED
+                await trigger_voice_shutdown(game.room.code, reason="match_complete")
         else:
             game.status = GameStatus.IN_PROGRESS
 

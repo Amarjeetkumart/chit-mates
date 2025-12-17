@@ -49,11 +49,16 @@ Services exposed:
 
    - Frontend:
      ```bash
-     export VITE_API_BASE_URL=http://localhost:8000/api
-     export VITE_WS_BASE_URL=ws://localhost:8000
+export VITE_API_BASE_URL=http://localhost:8000/api
+export VITE_WS_BASE_URL=ws://localhost:8000
+export VITE_SOCKET_BASE_URL=http://localhost:8000
+export VITE_VOICE_STUN_SERVERS=stun:stun.l.google.com:19302
      ```
+   > `VITE_SOCKET_BASE_URL` and `VITE_VOICE_STUN_SERVERS` are optional overrides; defaults fall back to the API host and the public Google STUN server.
    - Backend (optional overrides in `.env`):
      - `DATABASE_URL` – Async SQLAlchemy URL (defaults to local Postgres)
+     - `CHAT_HISTORY_LIMIT`, `CHAT_RATE_LIMIT_COUNT`, `CHAT_RATE_LIMIT_WINDOW_SECONDS`, `CHAT_PROFANITY_BLOCKLIST`
+     - `VOICE_STUN_SERVERS`
 
 ## Key Features
 
@@ -61,7 +66,8 @@ Services exposed:
 - Turn-based card passing enforcing no-repeat rule per sender/receiver pair.
 - Multi-round gameplay with persistent leaderboard tracking outcomes.
 - WebSocket push notifications for room state and live game updates.
-- REST endpoints for room management, gameplay actions, and leaderboard queries.
+- In-room text chat with typing indicators, profanity filtering, and rate limiting delivered via Socket.IO.
+- Peer-to-peer voice chat with push-to-talk, manual mute, auto mute on inactive tabs, and automatic shutdown when matches end.
 
 ## Testing & Linting
 
@@ -82,6 +88,7 @@ Services exposed:
 | `/api/game/next-round` | POST | Begin next round |
 | `/api/leaderboard` | GET | Leaderboard standings |
 | `/ws/rooms/{code}` | WS | Real-time room & game events |
+| `/ws/socket.io` | Socket.IO | Room-scoped chat, typing, and voice signaling |
 
 ## Database Schema
 
