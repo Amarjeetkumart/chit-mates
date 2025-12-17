@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from collections import Counter, deque
+from collections import Counter
 from typing import Iterable
 from uuid import UUID
 
@@ -91,30 +91,16 @@ class GameEngine:
         score_updates: dict[UUID, int] = {}
         auto_transfers: list[tuple[UUID, UUID, CardType]] = []
 
-        # Resolve immediate chain wins that can cascade from the received card
-        winners_queue: deque[UUID] = deque([receiver_id])
-        processed: set[UUID] = set()
-        last_winner_id: UUID | None = None
-
-        while winners_queue:
-            candidate_id = winners_queue.popleft()
-            if candidate_id in processed:
-                continue
-            processed.add(candidate_id)
-
-            candidate_state = state.players[candidate_id]
-            if not candidate_state.is_active:
-                continue
-
-            winner_card = self._detect_four_of_a_kind(candidate_state)
-            if winner_card is None:
-                continue
-
-            next_candidate_id = self._finalize_winner(state, candidate_id, winner_card, score_updates, auto_transfers)
-            last_winner_id = candidate_id
-
-            if next_candidate_id is not None and state.players[next_candidate_id].is_active:
-                winners_queue.append(next_candidate_id)
+        chain_last_winner: UUID | None = None
+        winner_card = self._detect_four_of_a_kind(receiver_state)
+        if winner_card is not None:
+            chain_last_winner = self._process_chain_wins(
+                state=state,
+                initial_winner_id=receiver_id,
+                initial_winner_card=winner_card,
+                score_updates=score_updates,
+                auto_transfers=auto_transfers,
+            )
 
         if state.is_round_complete():
             remaining = state.remaining_active_players()
@@ -127,8 +113,15 @@ class GameEngine:
             state.turn_counter += 1
             return state, score_updates, receiver_id, auto_transfers
 
-        if last_winner_id is not None:
-            next_active = state.get_player_after(last_winner_id)
+        if chain_last_winner is not None:
+            next_active = None
+            remaining_players = state.remaining_active_players()
+            if remaining_players:
+                next_active = self._find_next_active_player(state, chain_last_winner)
+                if next_active is None and remaining_players:
+                    next_active = remaining_players[0]
+            else:
+                next_active = state.get_active_player_id()
         elif receiver_id in state.finish_order:
             next_active = state.get_player_after(receiver_id)
         else:
@@ -141,138 +134,12 @@ class GameEngine:
             self._finalize_draw(state)
         return state, score_updates, receiver_id, auto_transfers
 
-    def _finalize_winner(
-        self,
-        state: RoundState,
-        winner_id: UUID,
-        winner_card: CardType,
-        score_updates: dict[UUID, int],
-        auto_transfers: list[tuple[UUID, UUID, CardType]],
-    ) -> UUID | None:
-        winner_state = state.players[winner_id]
-
-        finish_position = len(state.finish_order) + 1
-        score_delta = CARD_POINTS[winner_card] * 4
-        winner_state.score += score_delta
-        score_updates[winner_id] = score_updates.get(winner_id, 0) + score_delta
-        state.winner_cards[winner_id] = winner_card
-
-        active_players = state.remaining_active_players()
-        next_receiver_id: UUID | None = None
-
-        if len(active_players) > 1:
-            # Identify the next player that can safely accept the forced pass
-            next_receiver_id = self._select_receiver_with_capacity(state, winner_id)
-            winner_state.cards.remove(winner_card)
-            if next_receiver_id is not None:
-                receiver_state = state.players[next_receiver_id]
-                receiver_state.cards.append(winner_card)
-                state.record_pass(winner_id, next_receiver_id, winner_card)
-                auto_transfers.append((winner_id, next_receiver_id, winner_card))
-        else:
-            winner_state.cards.remove(winner_card)
-
-        removed = 0
-        while winner_card in winner_state.cards and removed < 3:
-            winner_state.cards.remove(winner_card)
-            removed += 1
-
-        leftover_cards = list(winner_state.cards)
-        winner_state.cards.clear()
-
-        state.eliminate_player(winner_id, finish_position)
-
-        if leftover_cards:
-            self._distribute_leftover_cards(state, winner_id, next_receiver_id, leftover_cards, auto_transfers)
-
-        self._enforce_hand_limits(state, auto_transfers)
-
-        return next_receiver_id
-
     def _detect_four_of_a_kind(self, player_state: PlayerRoundState) -> CardType | None:
         counter = Counter(player_state.cards)
         for card_type, count in counter.items():
             if count >= 4:
                 return card_type
         return None
-
-    def _select_receiver_with_capacity(
-        self,
-        state: RoundState,
-        start_player_id: UUID | None,
-        *,
-        max_cards: int = 5,
-    ) -> UUID | None:
-        order = state.turn_order
-        start_index = -1
-        if start_player_id is not None and start_player_id in order:
-            start_index = order.index(start_player_id)
-        count = len(order)
-        for offset in range(1, count + 1):
-            idx = (start_index + offset) % count
-            candidate_id = order[idx]
-            candidate_state = state.players[candidate_id]
-            if not candidate_state.is_active:
-                continue
-            if len(candidate_state.cards) < max_cards:
-                return candidate_id
-        return None
-
-    def _distribute_leftover_cards(
-        self,
-        state: RoundState,
-        winner_id: UUID,
-        starting_receiver_id: UUID | None,
-        leftover_cards: list[CardType],
-        auto_transfers: list[tuple[UUID, UUID, CardType]],
-    ) -> None:
-        active_players = state.remaining_active_players()
-        if not active_players:
-            return
-        pointer = starting_receiver_id if starting_receiver_id in active_players else None
-        for card in leftover_cards:
-            reference = pointer if pointer is not None else winner_id
-            receiver_id = self._select_receiver_with_capacity(state, reference)
-            if receiver_id is None:
-                pointer = None
-                continue
-            receiver_state = state.players[receiver_id]
-            receiver_state.cards.append(card)
-            state.record_pass(winner_id, receiver_id, card)
-            auto_transfers.append((winner_id, receiver_id, card))
-            pointer = receiver_id
-
-    def _enforce_hand_limits(
-        self,
-        state: RoundState,
-        auto_transfers: list[tuple[UUID, UUID, CardType]],
-        *,
-        max_cards: int = 5,
-    ) -> None:
-        iteration_guard = 0
-        adjusted = True
-        while adjusted and iteration_guard < 32:
-            adjusted = False
-            iteration_guard += 1
-            for player_id in state.turn_order:
-                player_state = state.players[player_id]
-                if not player_state.is_active:
-                    continue
-                while len(player_state.cards) > max_cards:
-                    receiver_id = self._select_receiver_with_capacity(state, player_id)
-                    if receiver_id is None or receiver_id == player_id:
-                        player_state.cards.pop()
-                        adjusted = True
-                        break
-                    card = player_state.cards.pop()
-                    receiver_state = state.players[receiver_id]
-                    receiver_state.cards.append(card)
-                    state.record_pass(player_id, receiver_id, card)
-                    auto_transfers.append((player_id, receiver_id, card))
-                    adjusted = True
-        for player_state in state.players.values():
-            if player_state.is_active and len(player_state.cards) > max_cards:
-                raise RuntimeError("Unable to rebalance player hands within limits")
 
     def _should_declare_draw(self, state: RoundState) -> bool:
         remaining = state.remaining_active_players()
@@ -288,3 +155,76 @@ class GameEngine:
             player_state.is_active = False
             player_state.finish_position = None
         state.finish_order.extend(remaining)
+
+    def _find_next_active_player(self, state: RoundState, origin_player_id: UUID) -> UUID | None:
+        order = state.turn_order
+        if origin_player_id not in order:
+            return None
+        if len(order) <= 1:
+            return None
+        idx = order.index(origin_player_id)
+        for _ in range(len(order) - 1):
+            idx = (idx + 1) % len(order)
+            candidate = order[idx]
+            candidate_state = state.players[candidate]
+            if candidate_state.is_active and candidate != origin_player_id:
+                return candidate
+        return None
+
+    def _select_forward_card(self, cards: list[CardType], winner_card: CardType) -> CardType | None:
+        for card in cards:
+            if card != winner_card:
+                return card
+        return cards[0] if cards else None
+
+    def _process_chain_wins(
+        self,
+        state: RoundState,
+        initial_winner_id: UUID,
+        initial_winner_card: CardType,
+        score_updates: dict[UUID, int],
+        auto_transfers: list[tuple[UUID, UUID, CardType]],
+    ) -> UUID | None:
+        pending_winner_id: UUID | None = initial_winner_id
+        pending_winner_card: CardType | None = initial_winner_card
+        last_winner_id: UUID | None = None
+
+        # Process sequential winners triggered by the chain rule.
+        while pending_winner_id is not None and pending_winner_card is not None:
+            winner_state = state.players[pending_winner_id]
+
+            score_delta = CARD_POINTS[pending_winner_card] * 4
+            winner_state.score += score_delta
+            score_updates[pending_winner_id] = score_updates.get(pending_winner_id, 0) + score_delta
+            state.winner_cards[pending_winner_id] = pending_winner_card
+
+            next_receiver_id = self._find_next_active_player(state, pending_winner_id)
+            forwarded_card: CardType | None = None
+            cards_snapshot = list(winner_state.cards)
+            if cards_snapshot and next_receiver_id is not None:
+                # Forward exactly one card before the winner exits the round.
+                forwarded_card = self._select_forward_card(cards_snapshot, pending_winner_card)
+                if forwarded_card is not None:
+                    cards_snapshot.remove(forwarded_card)
+                    receiver_state = state.players[next_receiver_id]
+                    receiver_state.cards.append(forwarded_card)
+                    state.record_pass(pending_winner_id, next_receiver_id, forwarded_card)
+                    auto_transfers.append((pending_winner_id, next_receiver_id, forwarded_card))
+
+            winner_state.cards.clear()
+            finish_position = len(state.finish_order) + 1
+            state.eliminate_player(pending_winner_id, finish_position)
+            last_winner_id = pending_winner_id
+
+            if forwarded_card is not None and next_receiver_id is not None:
+                next_receiver_state = state.players[next_receiver_id]
+                next_winner_card = self._detect_four_of_a_kind(next_receiver_state)
+                if next_winner_card is not None:
+                    pending_winner_id = next_receiver_id
+                    pending_winner_card = next_winner_card
+                    continue
+
+            pending_winner_id = None
+            pending_winner_card = None
+
+        return last_winner_id
